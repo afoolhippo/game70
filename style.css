@@ -469,11 +469,23 @@ button {
   cursor: default;
 }
 
-
-/* ver7：タイトル・結果は常に画面上端基準 */
+/* =========================================================
+   ver8：タイトル画面・結果画面を確実に上揃え
+   flex-direction: column にして、縦方向を justify-content で制御
+   ========================================================= */
 #titleScreen.screen.active,
 #resultScreen.screen.active {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: flex-start;
+  align-items: center;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
 }
+
+#titleScreen .card,
+#resultScreen .card {
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+
