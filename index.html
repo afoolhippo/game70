@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#091429">
+  <title>動物園閉園だよ！</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- タイトル -->
+    <section id="titleScreen" class="screen active">
+      <div class="card">
+        <img class="hero-image" src="title.png" alt="動物園閉園だよ！">
+        <h1>動物園閉園だよ！</h1>
+        <p class="lead">
+          閉園時間なのに、まだ帰らないお客さん。<br>
+          なぜか持っている「さすまた」で出口までご案内しよう！
+        </p>
+        <div class="howto">
+          <p><b>移動：</b>上下左右</p>
+          <p><b>さすまた：</b>ボタンを押している間、お客さんを押す</p>
+          <p><b>目的：</b>30秒で何人退園させられるか！</p>
+        </div>
+        <button id="startBtn" class="main-btn">閉園作業スタート！</button>
+      </div>
+    </section>
+
+    <!-- ゲーム -->
+    <section id="gameScreen" class="screen">
+      <div id="gameShell">
+        <div id="hud">
+          <div class="hud-box">
+            <span class="hud-label">のこり</span>
+            <span id="timeText" class="hud-value">30</span>
+          </div>
+          <div class="hud-title">動物園閉園だよ！</div>
+          <div class="hud-box">
+            <span class="hud-label">退園</span>
+            <span id="scoreText" class="hud-value">0人</span>
+          </div>
+        </div>
+
+        <div id="stageWrap">
+          <canvas id="gameCanvas" width="540" height="960"></canvas>
+
+          <div id="startOverlay" class="stage-message">閉園です！</div>
+          <div id="floatingLayer" aria-hidden="true"></div>
+
+          <!-- 左：移動 -->
+          <div id="dpad" class="control-zone" aria-label="移動操作">
+            <button class="dir-btn up" data-dir="up" aria-label="上">▲</button>
+            <button class="dir-btn left" data-dir="left" aria-label="左">◀</button>
+            <button class="dir-btn right" data-dir="right" aria-label="右">▶</button>
+            <button class="dir-btn down" data-dir="down" aria-label="下">▼</button>
+          </div>
+
+          <!-- 右：さすまた -->
+          <button id="pushBtn" aria-label="さすまたを出す">
+            <span class="push-icon">⊂</span>
+            <span class="push-label">さすまた</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 結果 -->
+    <section id="resultScreen" class="screen">
+      <div class="card result-card">
+        <img class="hero-image" src="result.png" alt="閉園作業終了">
+        <p class="result-label">閉園作業終了！</p>
+        <div id="resultScore" class="result-score">退園 0人</div>
+        <p id="resultComment" class="result-comment">おつかれさまでした。</p>
+        <button id="retryBtn" class="main-btn">もう一回</button>
+        <button id="titleBtn" class="sub-btn">タイトルに戻る</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
