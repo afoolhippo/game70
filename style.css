@@ -354,15 +354,14 @@ button {
    ========================================================= */
 #titleScreen,
 #resultScreen {
-  justify-content: flex-start;
   align-items: center;
-  padding-top: max(12px, env(safe-area-inset-top));
+  justify-content: flex-start;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 #titleScreen .card,
 #resultScreen .card {
-  margin-top: 10px;
-  margin-bottom: 18px;
+  margin: 0 auto 18px;
 }
 
 #titleScreen .hero-image {
@@ -468,4 +467,13 @@ button {
 .resultButton:disabled {
   opacity: .62;
   cursor: default;
+}
+
+
+/* ver7：タイトル・結果は常に画面上端基準 */
+#titleScreen.screen.active,
+#resultScreen.screen.active {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
