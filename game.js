@@ -27,8 +27,6 @@
   const resultScreen = document.getElementById("resultScreen");
 
   const startBtn = document.getElementById("startBtn");
-  const retryBtn = document.getElementById("retryBtn");
-  const titleBtn = document.getElementById("titleBtn");
   const gameTitleBtn = document.getElementById("gameTitleBtn");
 
   const canvas = document.getElementById("gameCanvas");
@@ -38,7 +36,6 @@
   const timeText = document.getElementById("timeText");
   const scoreText = document.getElementById("scoreText");
   const resultScore = document.getElementById("resultScore");
-  const resultComment = document.getElementById("resultComment");
   const startOverlay = document.getElementById("startOverlay");
   const floatingLayer = document.getElementById("floatingLayer");
   const resultButtons = document.getElementById("resultButtons");
@@ -140,6 +137,7 @@
   function resetGame() {
     scoreRegistered = false;
     if (resultButtonsTimer) clearTimeout(resultButtonsTimer);
+    resultButtonsTimer = 0;
     if (resultButtons) resultButtons.classList.add("hidden");
     if (registerButton) {
       registerButton.disabled = false;
@@ -162,7 +160,7 @@
     player.bob = 0;
 
     Object.keys(keys).forEach(k => keys[k] = false);
-    document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
+    resetJoystick();
 
     visitors = [];
     // 最初は5人。同じ5種類を1人ずつ出す。
@@ -215,21 +213,11 @@
 
   function startGame() {
     ensureAudio();
-  
-  if (shareButton) shareButton.addEventListener("click", shareResult);
-  if (registerButton) registerButton.addEventListener("click", registerScore);
-  if (retryButton) retryButton.addEventListener("click", returnToTitle);
-  if (arcadeButton) arcadeButton.addEventListener("click", () => {
-    window.location.href = ARCADE_URL;
-  });
-
-  resetGame();
+    resetGame();
     switchScreen("game");
     showStartMessage();
-
     startBgm();
 
-    // ほんの少し間を置いてから時間計測
     gameStartedAt = performance.now() + 650;
     lastTime = performance.now();
     rafId = requestAnimationFrame(loop);
@@ -290,27 +278,34 @@
     let mx = 0;
     let my = 0;
 
-    if (keys.left) mx -= 1;
-    if (keys.right) mx += 1;
-    if (keys.up) my -= 1;
-    if (keys.down) my += 1;
+    if (joystickState.active) {
+      mx = joystickState.x;
+      my = joystickState.y;
+    } else {
+      if (keys.left) mx -= 1;
+      if (keys.right) mx += 1;
+      if (keys.up) my -= 1;
+      if (keys.down) my += 1;
+    }
 
-    if (mx !== 0 || my !== 0) {
-      const len = Math.hypot(mx, my);
-      mx /= len;
-      my /= len;
+    const inputLength = Math.hypot(mx, my);
 
-      // 最後に強く入力された方向を完全に追う方式ではなく、
-      // 現在の入力ベクトルの主成分で向きを決める。
-      if (Math.abs(mx) > Math.abs(my)) {
-        player.dir = mx < 0 ? "left" : "right";
+    if (inputLength > 0.01) {
+      let magnitude = Math.min(1, inputLength);
+      if (!joystickState.active) magnitude = 1;
+
+      const nx = mx / inputLength;
+      const ny = my / inputLength;
+
+      if (Math.abs(nx) > Math.abs(ny)) {
+        player.dir = nx < 0 ? "left" : "right";
       } else {
-        player.dir = my < 0 ? "up" : "down";
+        player.dir = ny < 0 ? "up" : "down";
       }
 
-      player.x += mx * player.speed * dt;
-      player.y += my * player.speed * dt;
-      player.bob += dt * 12;
+      player.x += nx * player.speed * magnitude * dt;
+      player.y += ny * player.speed * magnitude * dt;
+      player.bob += dt * 12 * (.65 + magnitude * .35);
     }
 
     player.pushing = false;
@@ -318,7 +313,6 @@
 
     const halfW = player.w * .35;
     const halfH = player.h * .28;
-
     player.x = clamp(player.x, PLAY.left + halfW, PLAY.right - halfW);
     player.y = clamp(player.y, PLAY.top + halfH, PLAY.bottom - halfH);
   }
@@ -503,6 +497,8 @@
   function endGame() {
     cancelAnimationFrame(rafId);
     stopBgmWithFade(.55);
+    resetJoystick();
+
     timeLeft = 0;
     timeText.textContent = "0";
 
@@ -512,15 +508,8 @@
     setTimeout(() => {
       resultScore.textContent = `${score}人退園！`;
       switchScreen("result");
-    }, 450);    showResultButtonsLater();
-  }
-
-  function getResultComment(n) {
-    if (n >= 18) return "完璧な閉園！園内、静かです。";
-    if (n >= 13) return "かなり帰ってもらいました。おつかれさまです。";
-    if (n >= 8) return "閉園らしくなってきました。";
-    if (n >= 4) return "まだまだ園内に人影が……。";
-    return "本当に閉園できますか？";
+      showResultButtonsLater();
+    }, 450);
   }
 
   function draw() {
@@ -568,9 +557,10 @@
 
   function drawPlayer() {
     const img = staffImages[player.dir];
-    const bobY = (keys.up || keys.down || keys.left || keys.right)
-      ? Math.sin(player.bob) * 2
-      : 0;
+    const isMoving = joystickState.active
+      ? Math.hypot(joystickState.x, joystickState.y) > .01
+      : (keys.up || keys.down || keys.left || keys.right);
+    const bobY = isMoving ? Math.sin(player.bob) * 2 : 0;
 
     let scaleX = 1;
     let scaleY = 1;
@@ -652,34 +642,7 @@
   // -------------------------
   // 操作
   // -------------------------
-  document.querySelectorAll(".dir-btn").forEach(btn => {
-    const dir = btn.dataset.dir;
-
-    const on = e => {
-      e.preventDefault();
-      keys[dir] = true;
-      player.dir = dir;
-      btn.classList.add("active");
-    };
-
-    const off = e => {
-      e.preventDefault();
-      keys[dir] = false;
-      btn.classList.remove("active");
-    };
-
-    btn.addEventListener("pointerdown", e => {
-      btn.setPointerCapture?.(e.pointerId);
-      on(e);
-    });
-    btn.addEventListener("pointerup", off);
-    btn.addEventListener("pointercancel", off);
-    btn.addEventListener("lostpointercapture", off);
-  });
-
-
-
-  const joystickState = { x: 0, y: 0, active: false, pointerId: null };
+const joystickState = { x: 0, y: 0, active: false, pointerId: null };
 
   function updateJoystickFromPointer(e) {
     if (!joystick || !joystickKnob) return;
@@ -775,7 +738,7 @@
 
   window.addEventListener("blur", () => {
     Object.keys(keys).forEach(k => keys[k] = false);
-    document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
+    resetJoystick();
   });
 
 
@@ -1016,18 +979,27 @@
   // 画面ボタン
   // -------------------------
   function returnToTitle() {
-    resetJoystick();
     cancelAnimationFrame(rafId);
     stopBgmWithFade(.45);
     Object.keys(keys).forEach(k => keys[k] = false);
-    document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
+    resetJoystick();
+
+    if (resultButtonsTimer) {
+      clearTimeout(resultButtonsTimer);
+      resultButtonsTimer = 0;
+    }
+    resultButtons.classList.add("hidden");
     switchScreen("title");
   }
 
   startBtn.addEventListener("click", startGame);
-  retryBtn.addEventListener("click", startGame);
-  titleBtn.addEventListener("click", returnToTitle);
   gameTitleBtn.addEventListener("click", returnToTitle);
+  shareButton.addEventListener("click", shareResult);
+  registerButton.addEventListener("click", registerScore);
+  retryButton.addEventListener("click", returnToTitle);
+  arcadeButton.addEventListener("click", () => {
+    window.location.href = ARCADE_URL;
+  });
 
   // 初期表示
   switchScreen("title");

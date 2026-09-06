@@ -12,19 +12,17 @@
 </head>
 <body>
   <main id="app">
-    <!-- タイトル -->
     <section id="titleScreen" class="screen active">
-      <div class="card">
+      <div class="card title-card">
         <img class="hero-image" src="title.png" alt="動物園閉園だよ！">
         <p class="lead">
           閉園時間なのに、まだ帰らないお客さん。<br>
           なぜか持っている「さすまた」で出口までご案内しよう！
         </p>
-<button id="startBtn" class="main-btn">閉園作業スタート！</button>
+        <button id="startBtn" class="main-btn" type="button">閉園作業スタート！</button>
       </div>
     </section>
 
-    <!-- ゲーム -->
     <section id="gameScreen" class="screen">
       <div id="gameShell">
         <div id="hud">
@@ -41,36 +39,29 @@
 
         <div id="stageWrap">
           <canvas id="gameCanvas" width="540" height="960"></canvas>
-
           <div id="startOverlay" class="stage-message">閉園です！</div>
           <div id="floatingLayer" aria-hidden="true"></div>
 
-          <!-- 左：移動 -->
-          <div id="dpad" class="control-zone" aria-label="移動操作">
-            <button class="dir-btn up" data-dir="up" aria-label="上">▲</button>
-            <button class="dir-btn left" data-dir="left" aria-label="左">◀</button>
-            <button class="dir-btn right" data-dir="right" aria-label="右">▶</button>
-            <button class="dir-btn down" data-dir="down" aria-label="下">▼</button>
+          <div id="joystick" class="joystick" aria-label="移動用ジョイスティック">
+            <div class="joystick-ring"></div>
+            <div id="joystickKnob" class="joystick-knob"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 結果 -->
     <section id="resultScreen" class="screen">
       <div class="card result-card">
         <img class="hero-image" src="result.png" alt="閉園作業終了">
         <p class="result-label">閉園作業終了！</p>
         <div id="resultScore" class="result-score">0人退園！</div>
+
         <div id="resultButtons" class="resultButtons hidden">
-          <button id="shareButton" class="resultButton">Xでシェア</button>
-          <button id="registerButton" class="resultButton">記録を登録</button>
-          <button id="retryButton" class="resultButton">もう1回遊ぶ</button>
-          <button id="arcadeButton" class="resultButton">カバゲーセンへ</button>
+          <button id="shareButton" class="resultButton" type="button">Xでシェア</button>
+          <button id="registerButton" class="resultButton" type="button">記録を登録</button>
+          <button id="retryButton" class="resultButton" type="button">もう1回遊ぶ</button>
+          <button id="arcadeButton" class="resultButton" type="button">カバゲーセンへ</button>
         </div>
-        <p id="resultComment" class="result-comment">おつかれさまでした。</p>
-        <button id="retryBtn" class="main-btn">もう一回</button>
-        <button id="titleBtn" class="sub-btn">タイトルに戻る</button>
       </div>
     </section>
   </main>
