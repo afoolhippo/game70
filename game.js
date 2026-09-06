@@ -20,6 +20,7 @@
   const startBtn = document.getElementById("startBtn");
   const retryBtn = document.getElementById("retryBtn");
   const titleBtn = document.getElementById("titleBtn");
+  const gameTitleBtn = document.getElementById("gameTitleBtn");
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
@@ -31,7 +32,8 @@
   const resultComment = document.getElementById("resultComment");
   const startOverlay = document.getElementById("startOverlay");
   const floatingLayer = document.getElementById("floatingLayer");
-  const pushBtn = document.getElementById("pushBtn");
+  const bgm = document.getElementById("bgm");
+  bgm.volume = 0.20;
 
   const bg = loadImage("zoo_bg.png");
   const staffImages = {
@@ -54,20 +56,15 @@
     { speed: 13, push: 0.58, turn: 1.9 }  // 頑固
   ];
 
-  // 背景画像の左上にある「出口ゲート」に合わせた判定。
-  // 画像を差し替えたときはここだけ微調整すればOK。
-  const EXIT = {
-    x: 0,
-    y: 145,
-    w: 118,
-    h: 250
-  };
+  // 画面上部全体が退園エリア。
+  // お客さんをこのラインより上へ押し出せば退園成立。
+  const EXIT_Y = 145;
 
   // キャラクターが歩ける範囲
   const PLAY = {
     left: 38,
     right: 512,
-    top: 240,
+    top: 150,
     bottom: 885
   };
 
@@ -84,8 +81,7 @@
     up: false,
     down: false,
     left: false,
-    right: false,
-    push: false
+    right: false
   };
 
   const player = {
@@ -96,6 +92,7 @@
     speed: 175,
     dir: "left",
     pushing: false,
+    pushCooldown: 0,
     bob: 0
   };
 
@@ -128,11 +125,11 @@
     player.y = 610;
     player.dir = "left";
     player.pushing = false;
+    player.pushCooldown = 0;
     player.bob = 0;
 
     Object.keys(keys).forEach(k => keys[k] = false);
     document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
-    pushBtn.classList.remove("active");
 
     visitors = [];
     // 最初は5人。同じ5種類を1人ずつ出す。
@@ -182,6 +179,9 @@
     resetGame();
     switchScreen("game");
     showStartMessage();
+
+    bgm.currentTime = 0;
+    bgm.play().catch(() => {});
 
     // ほんの少し間を置いてから時間計測
     gameStartedAt = performance.now() + 650;
@@ -262,13 +262,13 @@
         player.dir = my < 0 ? "up" : "down";
       }
 
-      const moveMul = keys.push ? 0.83 : 1;
-      player.x += mx * player.speed * moveMul * dt;
-      player.y += my * player.speed * moveMul * dt;
+      player.x += mx * player.speed * dt;
+      player.y += my * player.speed * dt;
       player.bob += dt * 12;
     }
 
-    player.pushing = keys.push;
+    player.pushing = false;
+    if (player.pushCooldown > 0) player.pushCooldown -= dt;
 
     const halfW = player.w * .35;
     const halfH = player.h * .28;
@@ -312,19 +312,14 @@
       v.x += v.vx * type.speed * dt;
       v.y += v.vy * type.speed * dt;
 
-      // 出口に勝手に入ってしまわないよう、左側では押し戻す
-      const minX = 125;
-      if (v.x < minX) {
-        v.x = minX;
-        v.vx = Math.abs(v.vx);
+      // お客さんが勝手に退園しないよう、通常移動時は退園ラインより下に留める
+      if (v.y < EXIT_Y + 32) {
+        v.y = EXIT_Y + 32;
+        v.vy = Math.abs(v.vy);
       }
       if (v.x > PLAY.right - 20) {
         v.x = PLAY.right - 20;
         v.vx = -Math.abs(v.vx);
-      }
-      if (v.y < PLAY.top + 25) {
-        v.y = PLAY.top + 25;
-        v.vy = Math.abs(v.vy);
       }
       if (v.y > PLAY.bottom - 25) {
         v.y = PLAY.bottom - 25;
@@ -335,12 +330,10 @@
 
   function resolvePush(dt) {
     visitors.forEach(v => v.caught = false);
-    if (!player.pushing) return;
+
+    if (player.pushCooldown > 0) return;
 
     const hit = getPushHitbox();
-    const pushVec = dirVector(player.dir);
-
-    let pushedAny = false;
 
     for (const v of visitors) {
       if (v.removed) continue;
@@ -348,30 +341,33 @@
       const radius = Math.min(v.w, v.h) * .33;
       if (!circleRect(v.x, v.y, radius, hit)) continue;
 
+      const pushVec = dirVector(player.dir);
+      const pushDistance = 78 * VISITOR_TYPES[v.type].push;
+
       v.caught = true;
-      pushedAny = true;
+      v.x += pushVec.x * pushDistance;
+      v.y += pushVec.y * pushDistance;
 
-      const pushPower = 128 * VISITOR_TYPES[v.type].push;
-      v.x += pushVec.x * pushPower * dt;
-      v.y += pushVec.y * pushPower * dt;
+      // 左右・下方向では場外へ出さない。上方向だけ退園ラインを越えられる。
+      v.x = clamp(v.x, PLAY.left + 12, PLAY.right - 12);
+      if (pushVec.y >= 0) {
+        v.y = clamp(v.y, EXIT_Y + 24, PLAY.bottom - 15);
+      } else {
+        v.y = Math.max(v.y, 75);
+      }
 
-      // さすまたの先端から極端にズレないよう軽く中央へ寄せる
-      const target = pushTargetPoint();
-      v.x += (target.x - v.x) * Math.min(1, dt * 4.2);
-      v.y += (target.y - v.y) * Math.min(1, dt * 4.2);
+      player.pushing = true;
+      player.pushCooldown = .28;
 
-      // 移動可能域はキープ。ただし出口方向だけは左へ抜けられる
-      v.y = clamp(v.y, PLAY.top + 15, PLAY.bottom - 15);
-      v.x = Math.min(v.x, PLAY.right - 10);
+      hitPushSound();
+      vibrate(24);
 
       if (isInExit(v)) {
         retireVisitor(v);
       }
-    }
 
-    if (pushedAny && Math.random() < dt * 8) {
-      // 押している間の軽い「ググッ」音
-      scrapeSound();
+      // 1回の接触につき1人だけ押す
+      break;
     }
   }
 
@@ -408,14 +404,7 @@
   }
 
   function isInExit(v) {
-    // このゲームでは「さすまたで押されている状態」でのみ退園成立。
-    if (!v.caught) return false;
-
-    return (
-      v.x < EXIT.x + EXIT.w &&
-      v.y > EXIT.y &&
-      v.y < EXIT.y + EXIT.h
-    );
+    return v.caught && v.y < EXIT_Y;
   }
 
   function retireVisitor(v) {
@@ -440,6 +429,8 @@
 
   function endGame() {
     cancelAnimationFrame(rafId);
+    bgm.pause();
+    bgm.currentTime = 0;
     timeLeft = 0;
     timeText.textContent = "0";
 
@@ -472,11 +463,11 @@
       ctx.fillRect(0, 0, W, H);
     }
 
-    // 退園エリアをほんのり示す（背景の出口位置に合わせる）
+    // 画面上部全体の退園エリアをほんのり示す
     ctx.save();
-    ctx.globalAlpha = .13;
+    ctx.globalAlpha = .10;
     ctx.fillStyle = "#ffe46b";
-    ctx.fillRect(EXIT.x, EXIT.y, EXIT.w, EXIT.h);
+    ctx.fillRect(0, 0, W, EXIT_Y);
     ctx.restore();
 
     // Y座標で並べると、上下移動した時に自然な前後関係になる
@@ -495,7 +486,7 @@
 
     // さすまた判定をデバッグしたいときは true にする
     const DEBUG_HITBOX = false;
-    if (DEBUG_HITBOX && player.pushing) {
+    if (DEBUG_HITBOX) {
       const h = getPushHitbox();
       ctx.save();
       ctx.fillStyle = "rgba(255,70,70,.35)";
@@ -615,27 +606,6 @@
     btn.addEventListener("lostpointercapture", off);
   });
 
-  const pushOn = e => {
-    e.preventDefault();
-    ensureAudio();
-    keys.push = true;
-    pushBtn.classList.add("active");
-    bumpSound();
-  };
-
-  const pushOff = e => {
-    e.preventDefault();
-    keys.push = false;
-    pushBtn.classList.remove("active");
-  };
-
-  pushBtn.addEventListener("pointerdown", e => {
-    pushBtn.setPointerCapture?.(e.pointerId);
-    pushOn(e);
-  });
-  pushBtn.addEventListener("pointerup", pushOff);
-  pushBtn.addEventListener("pointercancel", pushOff);
-  pushBtn.addEventListener("lostpointercapture", pushOff);
 
   window.addEventListener("keydown", e => {
     if (state !== "game") {
@@ -657,12 +627,6 @@
     if (e.key === "ArrowRight" || k === "d") {
       keys.right = true; player.dir = "right"; e.preventDefault();
     }
-    if (e.key === " " || e.key === "Enter" || k === "z") {
-      if (!keys.push) bumpSound();
-      keys.push = true;
-      pushBtn.classList.add("active");
-      e.preventDefault();
-    }
   });
 
   window.addEventListener("keyup", e => {
@@ -671,16 +635,11 @@
     if (e.key === "ArrowDown" || k === "s") keys.down = false;
     if (e.key === "ArrowLeft" || k === "a") keys.left = false;
     if (e.key === "ArrowRight" || k === "d") keys.right = false;
-    if (e.key === " " || e.key === "Enter" || k === "z") {
-      keys.push = false;
-      pushBtn.classList.remove("active");
-    }
   });
 
   window.addEventListener("blur", () => {
     Object.keys(keys).forEach(k => keys[k] = false);
     document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
-    pushBtn.classList.remove("active");
   });
 
   // -------------------------
@@ -692,7 +651,7 @@
       if (AC) audioCtx = new AC();
     }
     if (audioCtx && audioCtx.state === "suspended") {
-      audioCtx.resume();
+      audioCtx.resume().catch(() => {});
     }
   }
 
@@ -713,18 +672,40 @@
     osc.stop(now + duration);
   }
 
-  function bumpSound() {
-    ensureAudio();
-    beep(120, .045, "square", .018);
+  function noiseBurst(duration = .06, volume = .018) {
+    if (!audioCtx) return;
+
+    const length = Math.floor(audioCtx.sampleRate * duration);
+    const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+    }
+
+    const source = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.0001, audioCtx.currentTime + duration);
+
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
   }
 
-  let lastScrape = 0;
-  function scrapeSound() {
-    if (!audioCtx) return;
-    const now = performance.now();
-    if (now - lastScrape < 120) return;
-    lastScrape = now;
-    beep(95 + Math.random() * 20, .03, "square", .012);
+  function hitPushSound() {
+    ensureAudio();
+
+    // 「ガシッ！」
+    beep(145, .055, "square", .035);
+    noiseBurst(.045, .015);
+
+    // 少し遅れて「ズザッ！」
+    setTimeout(() => {
+      beep(105, .085, "sawtooth", .018);
+      noiseBurst(.075, .010);
+    }, 45);
   }
 
   function exitSound() {
@@ -740,12 +721,19 @@
   // -------------------------
   // 画面ボタン
   // -------------------------
+  function returnToTitle() {
+    cancelAnimationFrame(rafId);
+    bgm.pause();
+    bgm.currentTime = 0;
+    Object.keys(keys).forEach(k => keys[k] = false);
+    document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
+    switchScreen("title");
+  }
+
   startBtn.addEventListener("click", startGame);
   retryBtn.addEventListener("click", startGame);
-  titleBtn.addEventListener("click", () => {
-    cancelAnimationFrame(rafId);
-    switchScreen("title");
-  });
+  titleBtn.addEventListener("click", returnToTitle);
+  gameTitleBtn.addEventListener("click", returnToTitle);
 
   // 初期表示
   switchScreen("title");

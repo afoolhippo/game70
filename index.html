@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#091429">
   <title>動物園閉園だよ！</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,15 +16,15 @@
     <section id="titleScreen" class="screen active">
       <div class="card">
         <img class="hero-image" src="title.png" alt="動物園閉園だよ！">
-        <h1>動物園閉園だよ！</h1>
         <p class="lead">
           閉園時間なのに、まだ帰らないお客さん。<br>
           なぜか持っている「さすまた」で出口までご案内しよう！
         </p>
         <div class="howto">
-          <p><b>移動：</b>上下左右</p>
-          <p><b>さすまた：</b>ボタンを押している間、お客さんを押す</p>
-          <p><b>目的：</b>30秒で何人退園させられるか！</p>
+          <p><b>移動：</b>上下左右ボタンでスタッフを動かす</p>
+          <p><b>さすまた：</b>スタッフが向いている方向に構えたまま。先端が来園者に触れると、その方向へ自動でグイッと押し出す</p>
+          <p><b>退園：</b>来園者を画面上部の出口まで押し出すと「退園！」</p>
+          <p><b>制限時間：</b>30秒で何人退園させられるか！</p>
         </div>
         <button id="startBtn" class="main-btn">閉園作業スタート！</button>
       </div>
@@ -35,11 +38,11 @@
             <span class="hud-label">のこり</span>
             <span id="timeText" class="hud-value">30</span>
           </div>
-          <div class="hud-title">動物園閉園だよ！</div>
           <div class="hud-box">
             <span class="hud-label">退園</span>
             <span id="scoreText" class="hud-value">0人</span>
           </div>
+          <button id="gameTitleBtn" class="hud-title-btn" type="button">タイトルへ</button>
         </div>
 
         <div id="stageWrap">
@@ -55,12 +58,6 @@
             <button class="dir-btn right" data-dir="right" aria-label="右">▶</button>
             <button class="dir-btn down" data-dir="down" aria-label="下">▼</button>
           </div>
-
-          <!-- 右：さすまた -->
-          <button id="pushBtn" aria-label="さすまたを出す">
-            <span class="push-icon">⊂</span>
-            <span class="push-label">さすまた</span>
-          </button>
         </div>
       </div>
     </section>
@@ -78,6 +75,7 @@
     </section>
   </main>
 
+  <audio id="bgm" src="bgm.mp3" preload="auto" loop></audio>
   <script src="game.js"></script>
 </body>
 </html>
