@@ -24,7 +24,7 @@
           <p><b>移動：</b>上下左右ボタンでスタッフを動かす</p>
           <p><b>さすまた：</b>スタッフが向いている方向に構えたまま。先端が来園者に触れると、その方向へ自動でグイッと押し出す</p>
           <p><b>退園：</b>来園者を画面上部の出口まで押し出すと「退園！」</p>
-          <p><b>制限時間：</b>30秒で何人退園させられるか！</p>
+          <p><b>制限時間：</b>60秒で何人退園させられるか！</p>
         </div>
         <button id="startBtn" class="main-btn">閉園作業スタート！</button>
       </div>
@@ -36,7 +36,7 @@
         <div id="hud">
           <div class="hud-box">
             <span class="hud-label">のこり</span>
-            <span id="timeText" class="hud-value">30</span>
+            <span id="timeText" class="hud-value">60</span>
           </div>
           <div class="hud-box">
             <span class="hud-label">退園</span>
@@ -75,7 +75,7 @@
     </section>
   </main>
 
-  <audio id="bgm" src="bgm.mp3" preload="auto" loop></audio>
+  <audio id="bgm" src="bgm.mp3" preload="auto"></audio>
   <script src="game.js"></script>
 </body>
 </html>

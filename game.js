@@ -9,7 +9,7 @@
   // visitor_01.png ～ visitor_05.png
   // =========================================================
 
-  const GAME_TIME = 30;
+  const GAME_TIME = 60;
   const W = 540;
   const H = 960;
 
@@ -33,7 +33,12 @@
   const startOverlay = document.getElementById("startOverlay");
   const floatingLayer = document.getElementById("floatingLayer");
   const bgm = document.getElementById("bgm");
-  bgm.volume = 0.20;
+  const BGM_TARGET_VOLUME = 0.20;
+  const BGM_FADE_IN = 1.0;
+  const BGM_FADE_OUT = 1.0;
+  let bgmFadeRaf = 0;
+  let bgmLoopArmed = false;
+  bgm.volume = 0;
 
   const bg = loadImage("zoo_bg.png");
   const staffImages = {
@@ -59,6 +64,11 @@
   // 画面上部全体が退園エリア。
   // お客さんをこのラインより上へ押し出せば退園成立。
   const EXIT_Y = 145;
+
+  // 押し出しアニメーション
+  const PUSH_DISTANCE = 78;
+  const PUSH_DURATION = 0.24;
+  const PUSH_COOLDOWN = 0.30;
 
   // キャラクターが歩ける範囲
   const PLAY = {
@@ -169,6 +179,12 @@
       dirTimer: .4 + Math.random() * 1.5,
       pauseTimer: 0,
       caught: false,
+      pushAnimating: false,
+      pushElapsed: 0,
+      pushFromX: x,
+      pushFromY: y,
+      pushToX: x,
+      pushToY: y,
       wobble: Math.random() * Math.PI * 2,
       removed: false
     };
@@ -180,8 +196,7 @@
     switchScreen("game");
     showStartMessage();
 
-    bgm.currentTime = 0;
-    bgm.play().catch(() => {});
+    startBgm();
 
     // ほんの少し間を置いてから時間計測
     gameStartedAt = performance.now() + 650;
@@ -281,12 +296,34 @@
     for (const v of visitors) {
       if (v.removed) continue;
 
-      v.wobble += dt * 6;
+      v.wobble += dt * (v.pushAnimating ? 10 : 6);
 
-      if (v.caught) {
-        // 押している間は通常移動を停止
+      if (v.pushAnimating) {
+        v.pushElapsed += dt;
+
+        const t = clamp(v.pushElapsed / PUSH_DURATION, 0, 1);
+        // easeOutCubic：最初は勢いよく、最後は滑らかに減速
+        const eased = 1 - Math.pow(1 - t, 3);
+
+        v.x = v.pushFromX + (v.pushToX - v.pushFromX) * eased;
+        v.y = v.pushFromY + (v.pushToY - v.pushFromY) * eased;
+        v.caught = true;
+
+        if (t >= 1) {
+          v.pushAnimating = false;
+          v.caught = false;
+
+          if (isInExit(v)) {
+            retireVisitor(v);
+            continue;
+          }
+        }
+
+        // 押し出し中は通常の徘徊移動を止める
         continue;
       }
+
+      v.caught = false;
 
       const type = VISITOR_TYPES[v.type];
 
@@ -329,44 +366,49 @@
   }
 
   function resolvePush(dt) {
-    visitors.forEach(v => v.caught = false);
+    player.pushing = false;
 
     if (player.pushCooldown > 0) return;
 
     const hit = getPushHitbox();
 
     for (const v of visitors) {
-      if (v.removed) continue;
+      if (v.removed || v.pushAnimating) continue;
 
       const radius = Math.min(v.w, v.h) * .33;
       if (!circleRect(v.x, v.y, radius, hit)) continue;
 
       const pushVec = dirVector(player.dir);
-      const pushDistance = 78 * VISITOR_TYPES[v.type].push;
+      const pushDistance = PUSH_DISTANCE * VISITOR_TYPES[v.type].push;
 
+      v.pushAnimating = true;
       v.caught = true;
-      v.x += pushVec.x * pushDistance;
-      v.y += pushVec.y * pushDistance;
+      v.pushElapsed = 0;
+      v.pushFromX = v.x;
+      v.pushFromY = v.y;
 
-      // 左右・下方向では場外へ出さない。上方向だけ退園ラインを越えられる。
-      v.x = clamp(v.x, PLAY.left + 12, PLAY.right - 12);
+      let targetX = v.x + pushVec.x * pushDistance;
+      let targetY = v.y + pushVec.y * pushDistance;
+
+      targetX = clamp(targetX, PLAY.left + 12, PLAY.right - 12);
+
       if (pushVec.y >= 0) {
-        v.y = clamp(v.y, EXIT_Y + 24, PLAY.bottom - 15);
+        targetY = clamp(targetY, EXIT_Y + 24, PLAY.bottom - 15);
       } else {
-        v.y = Math.max(v.y, 75);
+        // 上方向だけは退園ラインを越えて押し出せる
+        targetY = Math.max(targetY, 70);
       }
 
+      v.pushToX = targetX;
+      v.pushToY = targetY;
+
       player.pushing = true;
-      player.pushCooldown = .28;
+      player.pushCooldown = PUSH_COOLDOWN;
 
       hitPushSound();
       vibrate(24);
 
-      if (isInExit(v)) {
-        retireVisitor(v);
-      }
-
-      // 1回の接触につき1人だけ押す
+      // 1回の接触につき1人
       break;
     }
   }
@@ -404,7 +446,7 @@
   }
 
   function isInExit(v) {
-    return v.caught && v.y < EXIT_Y;
+    return v.y < EXIT_Y;
   }
 
   function retireVisitor(v) {
@@ -429,8 +471,7 @@
 
   function endGame() {
     cancelAnimationFrame(rafId);
-    bgm.pause();
-    bgm.currentTime = 0;
+    stopBgmWithFade(.55);
     timeLeft = 0;
     timeText.textContent = "0";
 
@@ -527,8 +568,8 @@
   }
 
   function drawVisitor(v) {
-    const wobble = v.caught ? Math.sin(v.wobble * 2.4) * 5 : 0;
-    const bob = v.caught ? 0 : Math.sin(v.wobble) * 1.5;
+    const wobble = v.pushAnimating ? Math.sin(v.wobble * 2.1) * 2.5 : 0;
+    const bob = v.pushAnimating ? 0 : Math.sin(v.wobble) * 1.5;
 
     ctx.save();
     ctx.translate(v.x, v.y + bob);
@@ -642,6 +683,102 @@
     document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
   });
 
+
+  // -------------------------
+  // BGM：フェードイン／フェードアウト付きループ
+  // -------------------------
+  function cancelBgmFade() {
+    if (bgmFadeRaf) {
+      cancelAnimationFrame(bgmFadeRaf);
+      bgmFadeRaf = 0;
+    }
+  }
+
+  function fadeBgm(from, to, duration, onDone = null) {
+    cancelBgmFade();
+
+    const start = performance.now();
+    bgm.volume = clamp(from, 0, 1);
+
+    const step = now => {
+      const t = clamp((now - start) / (duration * 1000), 0, 1);
+      // smoothstep
+      const eased = t * t * (3 - 2 * t);
+      bgm.volume = from + (to - from) * eased;
+
+      if (t < 1) {
+        bgmFadeRaf = requestAnimationFrame(step);
+      } else {
+        bgmFadeRaf = 0;
+        if (onDone) onDone();
+      }
+    };
+
+    bgmFadeRaf = requestAnimationFrame(step);
+  }
+
+  function armBgmLoopWatcher() {
+    if (bgmLoopArmed) return;
+    bgmLoopArmed = true;
+
+    bgm.addEventListener("timeupdate", () => {
+      if (state !== "game") return;
+      if (!Number.isFinite(bgm.duration) || bgm.duration <= 0) return;
+
+      const remain = bgm.duration - bgm.currentTime;
+
+      // 曲末1秒前からフェードアウト
+      if (remain <= BGM_FADE_OUT && remain > 0 && !bgm.dataset.fadingOut) {
+        bgm.dataset.fadingOut = "1";
+        fadeBgm(bgm.volume, 0, Math.max(.2, remain));
+      }
+    });
+
+    bgm.addEventListener("ended", () => {
+      if (state !== "game") return;
+
+      delete bgm.dataset.fadingOut;
+      bgm.currentTime = 0;
+      bgm.volume = 0;
+
+      bgm.play().then(() => {
+        fadeBgm(0, BGM_TARGET_VOLUME, BGM_FADE_IN);
+      }).catch(() => {});
+    });
+  }
+
+  function startBgm() {
+    armBgmLoopWatcher();
+    cancelBgmFade();
+    delete bgm.dataset.fadingOut;
+
+    bgm.pause();
+    bgm.currentTime = 0;
+    bgm.volume = 0;
+
+    bgm.play().then(() => {
+      fadeBgm(0, BGM_TARGET_VOLUME, BGM_FADE_IN);
+    }).catch(() => {});
+  }
+
+  function stopBgmWithFade(duration = .5) {
+    delete bgm.dataset.fadingOut;
+
+    if (bgm.paused) {
+      cancelBgmFade();
+      bgm.volume = 0;
+      bgm.currentTime = 0;
+      return;
+    }
+
+    const from = bgm.volume;
+    fadeBgm(from, 0, duration, () => {
+      bgm.pause();
+      bgm.currentTime = 0;
+      bgm.volume = 0;
+    });
+  }
+
   // -------------------------
   // Web Audio API：簡易SE
   // -------------------------
@@ -723,8 +860,7 @@
   // -------------------------
   function returnToTitle() {
     cancelAnimationFrame(rafId);
-    bgm.pause();
-    bgm.currentTime = 0;
+    stopBgmWithFade(.45);
     Object.keys(keys).forEach(k => keys[k] = false);
     document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
     switchScreen("title");
