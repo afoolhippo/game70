@@ -1,5 +1,14 @@
 (() => {
   "use strict";
+  const GAME_ID = "game70";
+  const GAME_TITLE = "動物園閉園だよ！";
+  const GAME_URL = "https://afoolhippo.github.io/game70/";
+  const ARCADE_URL = "https://afoolhippo.github.io/home/?skipTitle=1";
+  const SUPABASE_URL = "https://gmncxnybsovlallxgnkd.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_ly3h5OhL8HDSHhYdmJq_Fw_9pG3mhla";
+  const kabaDb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  let scoreRegistered = false;
+  let resultButtonsTimer = 0;
 
   // =========================================================
   // 動物園閉園だよ！ - prototype
@@ -32,6 +41,13 @@
   const resultComment = document.getElementById("resultComment");
   const startOverlay = document.getElementById("startOverlay");
   const floatingLayer = document.getElementById("floatingLayer");
+  const resultButtons = document.getElementById("resultButtons");
+  const shareButton = document.getElementById("shareButton");
+  const registerButton = document.getElementById("registerButton");
+  const retryButton = document.getElementById("retryButton");
+  const arcadeButton = document.getElementById("arcadeButton");
+  const joystick = document.getElementById("joystick");
+  const joystickKnob = document.getElementById("joystickKnob");
   const bgm = document.getElementById("bgm");
   const BGM_TARGET_VOLUME = 0.20;
   const BGM_FADE_IN = 1.0;
@@ -122,6 +138,13 @@
   }
 
   function resetGame() {
+    scoreRegistered = false;
+    if (resultButtonsTimer) clearTimeout(resultButtonsTimer);
+    if (resultButtons) resultButtons.classList.add("hidden");
+    if (registerButton) {
+      registerButton.disabled = false;
+      registerButton.textContent = "記録を登録";
+    }
     cancelAnimationFrame(rafId);
 
     timeLeft = GAME_TIME;
@@ -192,7 +215,15 @@
 
   function startGame() {
     ensureAudio();
-    resetGame();
+  
+  if (shareButton) shareButton.addEventListener("click", shareResult);
+  if (registerButton) registerButton.addEventListener("click", registerScore);
+  if (retryButton) retryButton.addEventListener("click", returnToTitle);
+  if (arcadeButton) arcadeButton.addEventListener("click", () => {
+    window.location.href = ARCADE_URL;
+  });
+
+  resetGame();
     switchScreen("game");
     showStartMessage();
 
@@ -479,10 +510,9 @@
     setTimeout(() => beep(190, .16, "square", .045), 120);
 
     setTimeout(() => {
-      resultScore.textContent = `退園 ${score}人`;
-      resultComment.textContent = getResultComment(score);
+      resultScore.textContent = `${score}人退園！`;
       switchScreen("result");
-    }, 450);
+    }, 450);    showResultButtonsLater();
   }
 
   function getResultComment(n) {
@@ -648,6 +678,71 @@
   });
 
 
+
+  const joystickState = { x: 0, y: 0, active: false, pointerId: null };
+
+  function updateJoystickFromPointer(e) {
+    if (!joystick || !joystickKnob) return;
+
+    const r = joystick.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    let dx = e.clientX - cx;
+    let dy = e.clientY - cy;
+
+    const max = r.width * 0.31;
+    const len = Math.hypot(dx, dy);
+    if (len > max) {
+      dx = dx / len * max;
+      dy = dy / len * max;
+    }
+
+    joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+    joystickState.x = dx / max;
+    joystickState.y = dy / max;
+
+    const dead = 0.14;
+    if (Math.hypot(joystickState.x, joystickState.y) < dead) {
+      joystickState.x = 0;
+      joystickState.y = 0;
+    }
+  }
+
+  function resetJoystick() {
+    joystickState.x = 0;
+    joystickState.y = 0;
+    joystickState.active = false;
+    joystickState.pointerId = null;
+    if (joystickKnob) joystickKnob.style.transform = "translate(0, 0)";
+  }
+
+  if (joystick) {
+    joystick.addEventListener("pointerdown", e => {
+      joystickState.active = true;
+      joystickState.pointerId = e.pointerId;
+      joystick.setPointerCapture(e.pointerId);
+      updateJoystickFromPointer(e);
+      ensureAudio();
+      e.preventDefault();
+    });
+
+    joystick.addEventListener("pointermove", e => {
+      if (!joystickState.active || e.pointerId !== joystickState.pointerId) return;
+      updateJoystickFromPointer(e);
+      e.preventDefault();
+    });
+
+    const releaseJoystick = e => {
+      if (joystickState.pointerId !== null && e.pointerId !== joystickState.pointerId) return;
+      resetJoystick();
+      e.preventDefault();
+    };
+
+    joystick.addEventListener("pointerup", releaseJoystick);
+    joystick.addEventListener("pointercancel", releaseJoystick);
+    joystick.addEventListener("lostpointercapture", resetJoystick);
+  }
+
   window.addEventListener("keydown", e => {
     if (state !== "game") {
       if ((e.key === "Enter" || e.key === " ") && state === "title") startGame();
@@ -683,6 +778,68 @@
     document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
   });
 
+
+
+  function showResultButtonsLater() {
+    if (!resultButtons) return;
+    if (resultButtonsTimer) clearTimeout(resultButtonsTimer);
+    resultButtons.classList.add("hidden");
+    resultButtonsTimer = setTimeout(() => {
+      resultButtons.classList.remove("hidden");
+    }, 1500);
+  }
+
+  function shareResult() {
+    const text =
+      `閉園です！お帰りくださーい！🌙🦛\n` +
+      `${score}人退園！\n` +
+      `無料ブラウザゲーム「${GAME_TITLE}」\n` +
+      `${GAME_URL}\n` +
+      `#動物園閉園だよ\n#カバゲーセン`;
+
+    const url = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function registerScore() {
+    if (scoreRegistered) {
+      alert("この記録は登録済みです");
+      return;
+    }
+    if (!kabaDb) {
+      alert("記録登録の準備に失敗しました");
+      return;
+    }
+
+    const nickname = prompt("ニックネームを入力してね", "匿名カバ");
+    if (!nickname) return;
+
+    registerButton.disabled = true;
+    registerButton.textContent = "登録中...";
+
+    const { error } = await kabaDb
+      .from("kaba_scores")
+      .insert({
+        game_id: GAME_ID,
+        game_title: GAME_TITLE,
+        nickname: nickname.trim(),
+        rank_title: "",
+        score: score
+      });
+
+    if (error) {
+      console.error(error);
+      registerButton.disabled = false;
+      registerButton.textContent = "記録を登録";
+      alert("登録に失敗しました");
+      return;
+    }
+
+    scoreRegistered = true;
+    registerButton.textContent = "登録済み";
+    registerButton.disabled = true;
+    alert("記録を登録しました！");
+  }
 
   // -------------------------
   // BGM：フェードイン／フェードアウト付きループ
@@ -859,6 +1016,7 @@
   // 画面ボタン
   // -------------------------
   function returnToTitle() {
+    resetJoystick();
     cancelAnimationFrame(rafId);
     stopBgmWithFade(.45);
     Object.keys(keys).forEach(k => keys[k] = false);

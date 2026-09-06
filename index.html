@@ -20,13 +20,7 @@
           閉園時間なのに、まだ帰らないお客さん。<br>
           なぜか持っている「さすまた」で出口までご案内しよう！
         </p>
-        <div class="howto">
-          <p><b>移動：</b>上下左右ボタンでスタッフを動かす</p>
-          <p><b>さすまた：</b>スタッフが向いている方向に構えたまま。先端が来園者に触れると、その方向へ自動でグイッと押し出す</p>
-          <p><b>退園：</b>来園者を画面上部の出口まで押し出すと「退園！」</p>
-          <p><b>制限時間：</b>60秒で何人退園させられるか！</p>
-        </div>
-        <button id="startBtn" class="main-btn">閉園作業スタート！</button>
+<button id="startBtn" class="main-btn">閉園作業スタート！</button>
       </div>
     </section>
 
@@ -67,7 +61,13 @@
       <div class="card result-card">
         <img class="hero-image" src="result.png" alt="閉園作業終了">
         <p class="result-label">閉園作業終了！</p>
-        <div id="resultScore" class="result-score">退園 0人</div>
+        <div id="resultScore" class="result-score">0人退園！</div>
+        <div id="resultButtons" class="resultButtons hidden">
+          <button id="shareButton" class="resultButton">Xでシェア</button>
+          <button id="registerButton" class="resultButton">記録を登録</button>
+          <button id="retryButton" class="resultButton">もう1回遊ぶ</button>
+          <button id="arcadeButton" class="resultButton">カバゲーセンへ</button>
+        </div>
         <p id="resultComment" class="result-comment">おつかれさまでした。</p>
         <button id="retryBtn" class="main-btn">もう一回</button>
         <button id="titleBtn" class="sub-btn">タイトルに戻る</button>
@@ -76,6 +76,7 @@
   </main>
 
   <audio id="bgm" src="bgm.mp3" preload="auto"></audio>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="game.js"></script>
 </body>
 </html>
